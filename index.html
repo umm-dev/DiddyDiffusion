@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>DiddyDiffusion — Pollinations Image Playground</title>
+  <style>
+    :root {
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #f7f7fb;
+      background: #0b0b10;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 20% 10%, rgba(117, 74, 255, .18), transparent 34rem),
+        radial-gradient(circle at 90% 85%, rgba(255, 82, 154, .12), transparent 30rem),
+        #0b0b10;
+    }
+    main {
+      width: min(920px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 56px 0 72px;
+    }
+    .eyebrow {
+      font-size: .78rem;
+      font-weight: 800;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: #aaa4c4;
+    }
+    h1 {
+      margin: 8px 0 12px;
+      font-size: clamp(2.35rem, 7vw, 5.1rem);
+      line-height: .96;
+      letter-spacing: -.055em;
+    }
+    .lead {
+      max-width: 690px;
+      margin: 0 0 28px;
+      color: #c8c5d6;
+      font-size: 1.04rem;
+      line-height: 1.65;
+    }
+    .panel {
+      border: 1px solid #2b2934;
+      background: rgba(20, 19, 27, .88);
+      border-radius: 22px;
+      padding: 20px;
+      box-shadow: 0 24px 80px rgba(0,0,0,.34);
+      backdrop-filter: blur(14px);
+    }
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .status {
+      margin-bottom: 16px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: #121118;
+      border: 1px solid #282632;
+      color: #c6c2d7;
+      line-height: 1.45;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #d7d4e2;
+      font-size: .9rem;
+      font-weight: 700;
+    }
+    textarea {
+      width: 100%;
+      min-height: 116px;
+      resize: vertical;
+      border: 1px solid #34313e;
+      border-radius: 16px;
+      background: #0f0e14;
+      color: #fff;
+      padding: 14px 15px;
+      font: inherit;
+      line-height: 1.5;
+      outline: none;
+    }
+    textarea:focus { border-color: #7668ff; }
+    button, a.button {
+      appearance: none;
+      border: 0;
+      border-radius: 13px;
+      padding: 11px 15px;
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+      text-decoration: none;
+      background: #7668ff;
+      color: white;
+    }
+    button.secondary, a.button.secondary {
+      background: #24212d;
+      color: #e4e1eb;
+      border: 1px solid #393542;
+    }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .actions { margin-top: 14px; }
+    .result {
+      margin-top: 20px;
+      min-height: 180px;
+      border-radius: 18px;
+      border: 1px dashed #34313e;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      background: #0e0d13;
+      color: #8f899f;
+      text-align: center;
+      padding: 14px;
+    }
+    .result img {
+      display: block;
+      width: 100%;
+      max-height: 720px;
+      object-fit: contain;
+      border-radius: 12px;
+    }
+    .fineprint {
+      margin-top: 18px;
+      color: #8e899f;
+      font-size: .83rem;
+      line-height: 1.55;
+    }
+    .fineprint a { color: #b9b2ff; }
+    code { color: #d6d1ff; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">Tiny BYOP demo</div>
+    <h1>DiddyDiffusion</h1>
+    <p class="lead">
+      A deliberately tiny image playground powered by Pollinations. Connect your own Pollinations account,
+      type a prompt, and generate an image with a user-authorized, budget-capped key.
+    </p>
+
+    <section class="panel">
+      <div id="status" class="status">Checking connection…</div>
+
+      <div class="row" style="margin-bottom:18px">
+        <button id="connect">Connect Pollinations</button>
+        <button id="disconnect" class="secondary">Disconnect</button>
+        <a class="button secondary" href="https://pollinations.ai" target="_blank" rel="noreferrer">Pollinations.ai ↗</a>
+      </div>
+
+      <label for="prompt">Image prompt</label>
+      <textarea id="prompt" placeholder="A tiny robot tending a glowing rooftop garden at midnight"></textarea>
+
+      <div class="row actions">
+        <button id="generate">Generate with Flux</button>
+      </div>
+
+      <div id="result" class="result">Your generated image will appear here.</div>
+
+      <p class="fineprint">
+        Built with <a href="https://pollinations.ai" target="_blank" rel="noreferrer">Pollinations</a> using Bring Your Own Pollen (BYOP).
+        This page does not contain a secret developer key. Each visitor explicitly authorizes their own short-lived key,
+        capped to a small Pollen budget. The key is kept in <code>sessionStorage</code> and disappears when the browser session ends.
+      </p>
+    </section>
+  </main>
+
+  <script src="./config.js"></script>
+  <script>
+    const CLIENT_ID = window.POLLINATIONS_CLIENT_ID || "";
+    const KEY_STORAGE = "diddydiffusion.pollinationsKey";
+    const STATE_STORAGE = "diddydiffusion.oauthState";
+
+    const statusEl = document.getElementById("status");
+    const promptEl = document.getElementById("prompt");
+    const resultEl = document.getElementById("result");
+    const connectBtn = document.getElementById("connect");
+    const disconnectBtn = document.getElementById("disconnect");
+    const generateBtn = document.getElementById("generate");
+
+    function cleanUrl() {
+      return `${location.origin}${location.pathname}`;
+    }
+
+    function randomState() {
+      const bytes = new Uint8Array(24);
+      crypto.getRandomValues(bytes);
+      return Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
+    }
+
+    function getKey() {
+      return sessionStorage.getItem(KEY_STORAGE);
+    }
+
+    function setStatus(message) {
+      statusEl.textContent = message;
+    }
+
+    function updateUi() {
+      const connected = Boolean(getKey());
+      generateBtn.disabled = !connected;
+      disconnectBtn.disabled = !connected;
+
+      if (!CLIENT_ID || CLIENT_ID.includes("REPLACE")) {
+        connectBtn.disabled = true;
+        setStatus("App key has not been configured yet.");
+      } else if (connected) {
+        connectBtn.disabled = true;
+        setStatus("Connected to Pollinations for this browser session. Your own authorized Pollen is used for generations.");
+      } else {
+        connectBtn.disabled = false;
+        setStatus("Not connected. Connect Pollinations to authorize a small, short-lived BYOP budget.");
+      }
+    }
+
+    function handleCallback() {
+      const hash = new URLSearchParams(location.hash.slice(1));
+      const returnedKey = hash.get("api_key");
+      const error = hash.get("error");
+      const returnedState = hash.get("state");
+      const expectedState = sessionStorage.getItem(STATE_STORAGE);
+
+      if (error) {
+        history.replaceState({}, "", cleanUrl());
+        setStatus(`Authorization failed: ${error}`);
+        return;
+      }
+
+      if (!returnedKey) return;
+
+      if (!expectedState || returnedState !== expectedState) {
+        history.replaceState({}, "", cleanUrl());
+        setStatus("Authorization callback was rejected because the state value did not match.");
+        return;
+      }
+
+      sessionStorage.setItem(KEY_STORAGE, returnedKey);
+      sessionStorage.removeItem(STATE_STORAGE);
+      history.replaceState({}, "", cleanUrl());
+    }
+
+    connectBtn.addEventListener("click", () => {
+      const state = randomState();
+      sessionStorage.setItem(STATE_STORAGE, state);
+
+      const params = new URLSearchParams({
+        redirect_uri: cleanUrl(),
+        client_id: CLIENT_ID,
+        models: "flux",
+        budget: "2",
+        expiry: "7",
+        state
+      });
+
+      location.href = `https://enter.pollinations.ai/authorize?${params.toString()}`;
+    });
+
+    disconnectBtn.addEventListener("click", () => {
+      sessionStorage.removeItem(KEY_STORAGE);
+      sessionStorage.removeItem(STATE_STORAGE);
+      resultEl.textContent = "Disconnected. Your generated image will appear here.";
+      updateUi();
+    });
+
+    generateBtn.addEventListener("click", () => {
+      const key = getKey();
+      const prompt = promptEl.value.trim();
+      if (!key || !prompt) {
+        setStatus(key ? "Enter a prompt first." : "Connect Pollinations first.");
+        return;
+      }
+
+      const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+      const imageUrl = new URL(`https://gen.pollinations.ai/image/${encodeURIComponent(prompt)}`);
+      imageUrl.searchParams.set("model", "flux");
+      imageUrl.searchParams.set("width", "1024");
+      imageUrl.searchParams.set("height", "1024");
+      imageUrl.searchParams.set("seed", String(seed));
+      imageUrl.searchParams.set("key", key);
+
+      resultEl.textContent = "Generating…";
+      const img = new Image();
+      img.alt = prompt;
+      img.onload = () => {
+        resultEl.replaceChildren(img);
+        setStatus("Generation complete.");
+      };
+      img.onerror = () => {
+        resultEl.textContent = "Generation failed. Your authorization may have expired or the model may be temporarily unavailable.";
+        setStatus("Pollinations returned an image error.");
+      };
+      img.src = imageUrl.toString();
+    });
+
+    handleCallback();
+    updateUi();
+  </script>
+</body>
+</html>
